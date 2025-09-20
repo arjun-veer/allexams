@@ -6,6 +6,12 @@ const documentSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'User ID is required']
   },
+  documentName: {
+    type: String,
+    required: [true, 'Document name is required'],
+    trim: true,
+    maxlength: [255, 'Document name cannot exceed 255 characters']
+  },
   fileName: {
     type: String,
     required: [true, 'File name is required'],
@@ -28,8 +34,30 @@ const documentSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Certificates', 'Identity', 'Exam Documents', 'Processed Documents', 'Uncategorized'],
-    default: 'Uncategorized'
+    enum: [
+      'Certificates',
+      'Identity Documents', 
+      'Academic Records',
+      'Exam Documents',
+      'Admit Cards',
+      'Result Documents',
+      'Marksheets',
+      'Transcripts',
+      'Character Certificates',
+      'Migration Certificates',
+      'Provisional Certificates',
+      'Degree Certificates',
+      'Professional Documents',
+      'Medical Certificates',
+      'Income Certificates',
+      'Residence Proof',
+      'Employment Documents',
+      'Legal Documents',
+      'Financial Documents',
+      'Insurance Documents',
+      'Other Documents'
+    ],
+    default: 'Other Documents'
   },
   storagePath: {
     type: String, // Path in cloud storage or local storage

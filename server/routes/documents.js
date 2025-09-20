@@ -4,21 +4,31 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { Document } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const router = express.Router();
 
-// Configure Cloudinary
+// Configure Cloudinary with explicit environment variables
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+console.log('Cloudinary config in documents route:', {
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY ? 'Set' : 'Not set',
+  api_secret: process.env.CLOUDINARY_API_SECRET ? 'Set' : 'Not set'
+});
+
 // Configure Cloudinary storage for multer
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: (req, file) => `docucenter/users/${req.user._id}`,
+    folder: 'docucenter/documents', // Use a general folder, we'll organize later
     resource_type: 'auto',
     allowed_formats: ['pdf', 'jpg', 'jpeg', 'png', 'docx'],
     public_id: (req, file) => {
@@ -98,21 +108,77 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Upload document
-router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+// Simple test upload route
+router.post('/test-upload', authenticateToken, (req, res) => {
+  console.log('Test upload route reached');
+  console.log('User:', req.user ? req.user._id : 'No user');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  
+  res.json({
+    success: true,
+    message: 'Test route working',
+    user: req.user ? req.user._id : 'No user'
+  });
+});
+
+// Upload document with multer error handling
+router.post('/upload', authenticateToken, (req, res, next) => {
+  console.log('Upload route starting...');
+  console.log('User authenticated:', req.user ? req.user._id : 'No user');
+  
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: 'File too large. Maximum size is 10MB.'
+          });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return res.status(400).json({
+            success: false,
+            message: 'Unexpected field. Please upload a file with field name "file".'
+          });
+        }
+      }
+      return res.status(500).json({
+        success: false,
+        message: err.message || 'File upload error'
+      });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
+    console.log('Upload request received');
+    console.log('User:', req.user ? req.user._id : 'No user');
+    console.log('File:', req.file ? req.file.originalname : 'No file');
+    console.log('Body:', req.body);
+
     if (!req.file) {
+      console.log('No file in request');
       return res.status(400).json({
         success: false,
         message: 'No file uploaded'
       });
     }
 
-    const { category = 'Uncategorized' } = req.body;
+    const { category = 'Other Documents', documentName } = req.body;
+
+    if (!documentName || !documentName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Document name is required'
+      });
+    }
 
     // Create document record with Cloudinary URL
     const document = new Document({
       userId: req.user._id,
+      documentName: documentName.trim(),
       fileName: req.file.originalname,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
@@ -259,10 +325,26 @@ router.get('/meta/categories', authenticateToken, async (req, res) => {
   try {
     const categories = [
       'Certificates',
-      'Identity', 
+      'Identity Documents', 
+      'Academic Records',
       'Exam Documents',
-      'Processed Documents',
-      'Uncategorized'
+      'Admit Cards',
+      'Result Documents',
+      'Marksheets',
+      'Transcripts',
+      'Character Certificates',
+      'Migration Certificates',
+      'Provisional Certificates',
+      'Degree Certificates',
+      'Professional Documents',
+      'Medical Certificates',
+      'Income Certificates',
+      'Residence Proof',
+      'Employment Documents',
+      'Legal Documents',
+      'Financial Documents',
+      'Insurance Documents',
+      'Other Documents'
     ];
 
     res.json({
@@ -297,6 +379,62 @@ router.get('/category/:category', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch documents'
+    });
+  }
+});
+
+// View/Stream document
+router.get('/view/:id', authenticateToken, async (req, res) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // For Cloudinary URLs, redirect to the direct URL for viewing
+    res.redirect(document.url);
+  } catch (error) {
+    console.error('View document error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to view document'
+    });
+  }
+});
+
+// Download document
+router.get('/download/:id', authenticateToken, async (req, res) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Set headers for download
+    res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+    res.setHeader('Content-Type', document.fileType);
+
+    // For Cloudinary URLs, redirect to the direct URL for download
+    res.redirect(document.url);
+  } catch (error) {
+    console.error('Download document error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to download document'
     });
   }
 });

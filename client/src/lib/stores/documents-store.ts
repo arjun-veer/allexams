@@ -32,7 +32,7 @@ type DocumentsState = {
   error: string | null;
   lastFetched: number | null;
   fetchDocuments: () => Promise<void>;
-  uploadDocument: (file: File, category: string) => Promise<void>;
+  uploadDocument: (file: File, documentName: string, category: string) => Promise<void>;
   deleteDocument: (documentId: string) => Promise<void>;
 };
 
@@ -68,12 +68,13 @@ export const useDocuments = create<DocumentsState>()(
             const transformedDocs = response.data.documents.map((doc: any) => ({
               id: doc._id || doc.id,
               userId: doc.userId,
+              documentName: doc.documentName || doc.fileName,
               fileName: doc.fileName,
               fileType: doc.fileType,
               fileSize: doc.fileSize,
-              category: doc.category || 'Uncategorized',
+              category: doc.category || 'Other Documents',
               createdAt: new Date(doc.createdAt),
-              url: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${doc.url}`,
+              url: doc.url, // Use the direct Cloudinary URL
             }));
             
             set({ 
@@ -90,11 +91,11 @@ export const useDocuments = create<DocumentsState>()(
         }
       },
       
-      uploadDocument: async (file: File, category: string) => {
+      uploadDocument: async (file: File, documentName: string, category: string) => {
         try {
           set({ isLoading: true, error: null });
           
-          const response = await apiClient.uploadDocument(file, category || 'Uncategorized') as UploadResponse;
+          const response = await apiClient.uploadDocument(file, documentName, category || 'Other Documents') as UploadResponse;
           
           if (!response.success) {
             const errorMessage = (response as any).message || 'Failed to upload document';
@@ -106,12 +107,13 @@ export const useDocuments = create<DocumentsState>()(
           const newDocument: UserDocument = {
             id: (response.data.document as any)._id || response.data.document.id,
             userId: response.data.document.userId,
+            documentName: (response.data.document as any).documentName || response.data.document.fileName,
             fileName: response.data.document.fileName,
             fileType: response.data.document.fileType,
             fileSize: response.data.document.fileSize,
-            category: response.data.document.category || 'Uncategorized',
+            category: response.data.document.category || 'Other Documents',
             createdAt: new Date(response.data.document.createdAt),
-            url: `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${response.data.document.url}`,
+            url: (response.data.document as any).url,
           };
           
           set((state) => ({

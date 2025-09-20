@@ -192,9 +192,10 @@ class ApiClient {
     return this.request(`/documents?${queryParams.toString()}`);
   }
 
-  async uploadDocument(file: File, category?: string) {
+  async uploadDocument(file: File, documentName: string, category?: string) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('documentName', documentName);
     if (category) {
       formData.append('category', category);
     }
@@ -237,6 +238,14 @@ class ApiClient {
 
   async getDocumentsByCategory(category: string) {
     return this.request(`/documents/category/${category}`);
+  }
+
+  async viewDocument(id: string): Promise<string> {
+    return `${API_BASE_URL}/documents/view/${id}`;
+  }
+
+  async downloadDocument(id: string): Promise<string> {
+    return `${API_BASE_URL}/documents/download/${id}`;
   }
 
   // User methods

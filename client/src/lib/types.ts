@@ -41,6 +41,7 @@ export interface Exam {
 export interface UserDocument {
   id: string;
   userId?: string; // Make userId optional to match current implementation
+  documentName: string; // Display name for the document
   fileName: string;
   fileType: string; // Using string type to allow for more flexibility
   fileSize: number; // in KB
